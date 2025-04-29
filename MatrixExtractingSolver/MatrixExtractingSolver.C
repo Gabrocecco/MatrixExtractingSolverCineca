@@ -78,7 +78,7 @@ void AddInterface(Foam::dictionary& interfacesDict, const Foam::processorFvPatch
   Foam::dictionary thisInterfaceDict;
   
   const Foam::fvPatch& patch = ptr->patch();
-  const Foam::unallocLabelList& localCellIds = patch.faceCells();
+  const Foam::labelList& localCellIds = patch.faceCells();
   
   thisInterfaceDict.add("localCellIds", localCellIds);
   thisInterfaceDict.add("coeffs", coupleCoeffs);
@@ -93,7 +93,7 @@ Foam::dictionary Foam::MatrixExtractingSolver::GetInterfaceCoeffs(const directio
   {
     if (interfaces_.set(interfaceI))
     {
-      const scalarField& coeffs = coupleBouCoeffs_[interfaceI];
+      const scalarField& coeffs = interfaceBouCoeffs_[interfaceI];
       if (const processorFvPatchField<Vector<double> >* ptr = dynamic_cast<const processorFvPatchField<Vector<double> >*>(interfaces_(interfaceI)))
       {
 	AddInterface(interfaceDict, ptr, coeffs);
@@ -126,7 +126,7 @@ SolverPerformance Foam::MatrixExtractingSolver::solve
   // Do this first so it sets up the solverPerformance object which we
   // can query for useful things.
   ::SolverPerformance sPerf = worker->solve(x, b, cmpt);
-  
+
   if (shouldWrite())
   {
     word dictMetaName = fieldName() + ".metadata";
@@ -152,13 +152,13 @@ SolverPerformance Foam::MatrixExtractingSolver::solve
       {
 	metaDict = dynamic_cast<IOdictionary*>(item());
       }
-    
-    label lastWriteTime = metaDict->lookupOrDefault("time", -1, false, false);
+
+    label lastWriteTime = metaDict->getOrDefault("time", -1);
     label subCycle = 0;
     if (lastWriteTime == appTime.timeIndex())
       {
 	// Iteration > 0
-	subCycle = metaDict->lookupOrDefault("iteration", subCycle, false, false) + 1;
+	subCycle = metaDict->getOrDefault("iteration", subCycle) + 1;
       }
     
     word dictName;
@@ -169,6 +169,8 @@ SolverPerformance Foam::MatrixExtractingSolver::solve
     }
     item = appTime.find(dictName);
     IOdictionary* systemDict = NULL;
+
+
     if (item == appTime.objectRegistry::end())
       {
 	// Construct it
@@ -190,7 +192,7 @@ SolverPerformance Foam::MatrixExtractingSolver::solve
 	systemDict = dynamic_cast<IOdictionary*>(item());
       }
     systemDict->clear();
-    
+
     // Add the source vector
     systemDict->add("source", b);
 
@@ -243,7 +245,7 @@ SolverPerformance Foam::MatrixExtractingSolver::solve
     metaDict->set("time", appTime.timeIndex());
     metaDict->set("iteration", subCycle);
   }
-  
+
   return sPerf;
 }
 
